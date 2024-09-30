@@ -1,16 +1,15 @@
 import random
 import time
-from typing import List
 
-dataset = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+from baseline.core import Data, Dataset
 
 
-def generate_dataset(n=10) -> List[int]:
-    []
-
+def generate_dataset(n=10) -> Dataset:
     random.seed(int(time.time() * 1000))
 
-    return [random.randint(0, 100) for _ in range(n)]
+    return Dataset(
+        [Data(value=random.randint(0, 100), properties=["test"]) for _ in range(n)]
+    )
 
 
 class RandomService:
