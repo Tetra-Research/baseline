@@ -1,12 +1,5 @@
+from abc import ABC
 from typing import Any, Callable, List
-
-
-class Expander:
-    pass
-
-
-class Selector:
-    pass
 
 
 class Data:
@@ -15,23 +8,50 @@ class Data:
         self.value = value
 
 
+class Expander(ABC):
+    def __init__(self, data: Data):
+        pass
+
+    def expand(self):
+        pass
+
+
 class Dataset:
     def __init__(self, dataset: List[Data]):
         self.dataset = dataset
 
 
+class Selector(ABC):
+    def select():
+        pass
+
+
 class Outcome:
     def __init__(self, data: Data, value: Any):
+        self.data = data
+        self.value = value
         self.properties = []
         self.properties.extend(data.properties)
 
-    def add_property(self, property: str):
-        self.properties.append(property)
+    def add_property(self, _property: str):
+        self.properties.append(_property)
 
 
-class Evaluator:
-    def eval(data: Data, outcome: Outcome):
+class Evaluator(ABC):
+    def __init__(self, _property: str):
         pass
+
+    def eval(self, outcome: Outcome) -> bool:
+        pass
+
+
+class Above50(Evaluator):
+    def __init__(self):
+        self.property = "above_50"
+
+    def eval(self, outcome: Outcome) -> bool:
+        if outcome.value > 50:
+            outcome.add_property(self.property)
 
 
 class Simulation:
@@ -50,9 +70,12 @@ class Simulation:
 
     def run(self):
         for _ in range(self.num_runs):
-            self.outcomes.append(
-                Outcome(data=self.data, value=self.callback(self.data.value))
-            )
+            outcome = Outcome(data=self.data, value=self.callback(self.data.value))
+
+            for expander in self.evaluators:
+                expander.eval(outcome)
+
+            self.outcomes.append(outcome)
 
         return self.outcomes
 
@@ -75,5 +98,3 @@ class Evaluation:
     def run(self):
         for simulation in self.simulations:
             self.outcomes.extend(simulation.run())
-
-        print(len(self.outcomes))
