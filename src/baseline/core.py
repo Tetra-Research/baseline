@@ -45,15 +45,6 @@ class Evaluator(ABC):
         pass
 
 
-class Above50(Evaluator):
-    def __init__(self):
-        self.property = "above_50"
-
-    def eval(self, outcome: Outcome) -> bool:
-        if outcome.value > 50:
-            outcome.add_property(self.property)
-
-
 class Simulation:
     def __init__(
         self,
@@ -84,11 +75,11 @@ class Evaluation:
     def __init__(
         self,
         dataset: Dataset,
-        selector: Selector,
+        # selector: Selector,
         evaluators: List[Evaluator],
         callback: Callable[[Any], Any],
     ):
-        self.selector = selector
+        # self.selector = selector
         self.simulations: List[Simulation] = [
             Simulation(data=data, callback=callback, evaluators=evaluators)
             for data in dataset.dataset
