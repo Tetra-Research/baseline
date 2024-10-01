@@ -51,7 +51,7 @@ class Simulation:
         data: Data,
         evaluators: List[Evaluator],
         callback: Callable[[], Any],
-        num_runs: int = 10,
+        num_runs: int = 1,
     ):
         self.data = data
         self.evaluators = evaluators
@@ -60,7 +60,8 @@ class Simulation:
         self.outcomes: List[Outcome] = []
 
     def run(self):
-        for _ in range(self.num_runs):
+        for i in range(self.num_runs):
+            print("run ", i)
             outcome = Outcome(data=self.data, value=self.callback(self.data.value))
 
             for expander in self.evaluators:
@@ -87,5 +88,7 @@ class Evaluation:
         self.outcomes: List[Outcome] = []
 
     def run(self):
+        i = 0
         for simulation in self.simulations:
             self.outcomes.extend(simulation.run())
+            i += 1
