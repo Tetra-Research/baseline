@@ -1,5 +1,10 @@
-from projects.mvp.random_service import RandomService, generate_dataset
+from dotenv import load_dotenv
+from projects.mvp.test import run as run_mvp
+from projects.promptbuf.test import run as run_promptbuf
+from projects.promptbuf.full_test import run as run_promptbuf_full
 
+load_dotenv()
 if __name__ == "__main__":
-    for d in generate_dataset():
-        print("result: ", RandomService.generate(d))
+    # run_mvp()
+    # run_promptbuf()
+    run_promptbuf_full()
