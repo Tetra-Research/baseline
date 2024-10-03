@@ -1,224 +1,84 @@
-from enum import Enum
 import json
-from typing import Any
-from baseline.core import Data, Dataset, Evaluation, Evaluator, Outcome
-from .lib_cpy import encode, decode
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+from baseline import Data, Evaluation, Evaluator, Outcome
+from projects.promptbuf.lib_cpy import decode
+
+load_dotenv()
+
+
+introductions = [
+    "My name is Sarah Martinez, and I'm 28 years old. By day, I work as a Marketing Manager, handling everything from campaign strategies to content creation. By night, I’m working towards my MBA, hoping it’ll open more doors for leadership roles in my company. Honestly, balancing work and school can be tough, but I enjoy staying busy. When I have downtime, I love painting—mostly landscapes—and hiking with my dog, Luna. It’s my way of recharging after long workdays.",
+    "Hey, I’m David Chen, and I’m 32. I’m a Software Engineer and spend most of my time solving complex problems for my company’s backend systems. I’m doing a Master’s in Data Science because I want to dive deeper into machine learning and AI. Outside of work and class, I’m really into photography. On weekends, you’ll usually find me out in nature, trying to capture the perfect shot at sunrise. It’s my creative outlet, especially when coding starts to get a bit too technical.",
+    "Hi, I’m Amelia Johnson, 26, and I’m currently a stay at home mom. My goal is to complete my Master’s in Communication so I can eventually move into a leadership role, maybe even start my own PR agency one day. I’m really into fitness, so when I’m not in class, I’m usually hitting the gym or doing Pilates. I also love cooking, and I’m always trying new recipes—I’m kind of obsessed with Italian food right now.",
+    "I’m Marcus O’Neill, and I’m 35. By day, I work as a Project Manager in the tech industry, and by night, I’m a graduate student pursuing my Master’s in Organizational Leadership. I’m hoping it’ll give me the skills to move into a director-level role soon. Outside of all the hustle, I’m a huge sports fan. I play in a local soccer league, and watching games—especially Premier League—is how I unwind. I also dabble in woodworking, believe it or not, and I find it super relaxing.",
+    "Hey, I’m Jasmine Patel, 29, and I work as a Financial Analyst during the day. I’m getting my Master’s in Finance because I want to specialize in investment strategies and maybe even start my own advisory firm someday. Outside of work and school, I’m an avid reader—thrillers and mysteries are my favorite genres. I also enjoy traveling, and I try to take at least one big trip each year. Exploring new cultures and food is a huge passion of mine, and it helps me recharge between semesters.",
+]
 
 
 class ValidJSON(Evaluator):
-    def __init__(self):
-        self.property = "valid_json"
+    property = "valid_json"
 
     def eval(self, outcome: Outcome):
         try:
             json.loads(json.dumps(outcome.value))
-            outcome.add_property(self.property)
+            outcome.properties.append(self.property)
         except Exception as e:
-            print("exception1", e)
+            print("exception", e)
             return
 
 
-class AccurateJSON(Evaluator):
-    def __init__(self):
-        self.property = "accurate_json"
+def prompt(content: str) -> str:
+    client = OpenAI(
+        api_key=os.environ.get("OPENAI_API_KEY"),
+    )
 
-    def eval(self, outcome: Outcome) -> bool:
-        try:
-            is_match = json.dumps(outcome.data.value[0]) == json.dumps(outcome.value)
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": """
+                Below is a user written summary.  
+                
+                Extract the following details:
+                - name, in quotes
+                - age, integer
+                - isEmployed, boolean, as 1 or 0
 
-            if is_match:
-                outcome.add_property(self.property)
+                In this space-delimited, minified JSON format: 
+                {name age isEmployed}
+                """,
+            },
+            {"role": "user", "content": content},
+        ],
+        model="gpt-4o",
+    )
 
-        except Exception as e:
-            print("exception1", e)
-            return
-
-
-class Color(Enum):
-    RED = "red"
-    GREEN = "green"
-    BLUE = "blue"
+    return decode(
+        v=chat_completion.choices[0].message.content,
+        s={
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"},
+                "isEmployed": {"type": "boolean"},
+            },
+        },
+    )
 
 
 def run():
-    evaluators = [ValidJSON(), AccurateJSON()]
+    dataset = [Data(value=intro, properties=["easy"]) for intro in introductions]
 
-    dataset = Dataset(
-        dataset=[
-            # Primitives
-            Data(value=(1, {"type": "integer"}), properties=["primitive", "integer"]),
-            Data(value=(15, {"type": "integer"}), properties=["primitive", "integer"]),
-            Data(value=(1.5, {"type": "number"}), properties=["primitive", "number"]),
-            Data(value=(11.55, {"type": "number"}), properties=["primitive", "number"]),
-            Data(
-                value=("Test string", {"type": "string"}),
-                properties=["primitive", "string"],
-            ),
-            Data(
-                value=(True, {"type": "boolean"}), properties=["primitive", "boolean"]
-            ),
-            Data(value=(None, {"type": "null"}), properties=["primitive", "null"]),
-            Data(
-                value=(
-                    Color.GREEN.value,
-                    {"type": "string", "enum": ["red", "green", "blue"]},
-                ),
-                properties=["primitive", "enum"],
-            ),
-            # Arrays
-            Data(
-                value=([1, 2], {"type": "array", "items": {"type": "integer"}}),
-                properties=["array", "integer"],
-            ),
-            Data(
-                value=([11, 22], {"type": "array", "items": {"type": "integer"}}),
-                properties=["array", "integer"],
-            ),
-            Data(
-                value=([1.5, 2.5], {"type": "array", "items": {"type": "number"}}),
-                properties=["array", "number"],
-            ),
-            Data(
-                value=([11.55, 22.55], {"type": "array", "items": {"type": "number"}}),
-                properties=["array", "number"],
-            ),
-            Data(
-                value=(
-                    ["test", "string"],
-                    {"type": "array", "items": {"type": "string"}},
-                ),
-                properties=["array", "string"],
-            ),
-            Data(
-                value=(
-                    [Color.BLUE.value, Color.GREEN.value, Color.RED.value],
-                    {
-                        "type": "array",
-                        "items": {"type": "string", "enum": ["red", "green", "blue"]},
-                    },
-                ),
-                properties=["array", "enum"],
-            ),
-            # Objects
-            Data(
-                value=(
-                    {"name": "Tyler", "age": 29, "isEnabled": True},
-                    {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "age": {"type": "integer"},
-                            "isEnabled": {"type": "boolean"},
-                        },
-                    },
-                ),
-                properties=["object", "string", "number", "boolean"],
-            ),
-            Data(
-                value=(
-                    {
-                        "name": "Tyler",
-                        "age": 29,
-                        "isEnabled": False,
-                        "ids": [1, 2, 3, 4, 5],
-                    },
-                    {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "age": {"type": "integer"},
-                            "isEnabled": {"type": "boolean"},
-                            "ids": {"type": "array", "items": {"type": "integer"}},
-                        },
-                    },
-                ),
-                properties=["object", "array", "boolean", "integer", "string"],
-            ),
-            Data(
-                value=(
-                    {"age": 29, "isEnabled": True},
-                    {
-                        "type": "object",
-                        "properties": {
-                            "age": {"type": "integer"},
-                            "isEnabled": {"type": "boolean"},
-                        },
-                    },
-                ),
-                properties=["object", "integer", "boolean"],
-            ),
-            Data(
-                value=(
-                    {"name": {"first": "Tyler", "last": "O'Briant"}},
-                    {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "object",
-                                "properties": {
-                                    "first": {"type": "string"},
-                                    "last": {"type": "string"},
-                                },
-                            },
-                        },
-                    },
-                ),
-                properties=["object", "nested_1", "string"],
-            ),
-            Data(
-                value=(
-                    {
-                        "name": {"first": "Tyler", "last": "O'Briant"},
-                        "age": 29,
-                        "isEnabled": True,
-                    },
-                    {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "object",
-                                "properties": {
-                                    "first": {"type": "string"},
-                                    "last": {"type": "string"},
-                                },
-                            },
-                            "age": {"type": "integer"},
-                            "isEnabled": {"type": "boolean"},
-                        },
-                    },
-                ),
-                properties=["object", "nested_1", "boolean", "age", "string"],
-            ),
-            Data(
-                value=(
-                    {"ids": [1, 2, 3, 4, 5], "age": 29, "isEnabled": False},
-                    {
-                        "type": "object",
-                        "properties": {
-                            "ids": {
-                                "type": "array",
-                                "items": {"type": "integer"},
-                            },
-                            "age": {"type": "integer"},
-                            "isEnabled": {"type": "boolean"},
-                        },
-                    },
-                ),
-                properties=["object", "array", "integer", "boolean", "primitive"],
-            ),
-        ]
+    evaluators = [ValidJSON()]
+
+    evaluation = Evaluation(
+        dataset=dataset, callback=prompt, evaluators=evaluators, num_simulation_runs=1
     )
-
-    def promptbuf(v: Any):
-        return decode(encode(v[0], v[1]), v[1])
-
-    evaluation = Evaluation(dataset, evaluators, callback=promptbuf)
 
     evaluation.run()
 
-    for i in range(int(len(evaluation.outcomes) / 10)):
-        outcome = evaluation.outcomes[(i * 10)]
-        print(
-            "valid_json" in outcome.properties
-            and "accurate_json" in outcome.properties,
-        )
+    for result in evaluation.results:
+        print("valid_json" in result.outcome.properties)
