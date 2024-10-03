@@ -95,3 +95,14 @@ class Evaluation(Generic[DataType, OutcomeType]):
     def run(self):
         for simulation in self.simulations:
             self.results.extend(simulation.run())
+
+
+class Threshold(ABC):
+    name: str = ""
+
+    @abstractmethod
+    def evaluate(
+        self,
+        baseline_evaluation: Evaluation[DataType, OutcomeType],
+        comparision_evaluation: Evaluation[DataType, OutcomeType],
+    ): ...

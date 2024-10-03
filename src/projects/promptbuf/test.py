@@ -1,9 +1,10 @@
 import json
 import os
+from typing import Any
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from baseline import Data, Evaluation, Evaluator, Outcome
+from baseline import Data, Evaluation, Evaluator, Outcome, Threshold
 from projects.promptbuf.lib_cpy import decode
 
 load_dotenv()
@@ -28,6 +29,36 @@ class ValidJSON(Evaluator):
         except Exception as e:
             print("exception", e)
             return
+
+
+class ValidJSONCountThreshold(Threshold):
+    name = "valid_json_count"
+
+    def evaluate(
+        self,
+        baseline_evaluation: Evaluation[str, Any],
+        comparison_evaluation: Evaluation[str, Any],
+    ):
+        baseline_perc = self.__calc_perc(baseline_evaluation)
+        comparision_perc = self.__calc_perc(comparison_evaluation)
+
+        print(baseline_perc, comparision_perc)
+
+        if baseline_perc == comparision_perc:
+            print("Hooray no deviation!")
+
+        else:
+            print(
+                f"{(comparision_perc - baseline_perc)/baseline_perc} deviation from baseline"
+            )
+
+    def __calc_perc(self, eval: Evaluation[str, Any]) -> float:
+        valid_count = 0
+        for result in eval.results:
+            if ValidJSON.property in result.outcome.properties:
+                valid_count += 1
+
+        return valid_count / len(eval.results)
 
 
 def prompt(content: str) -> str:
@@ -69,12 +100,13 @@ def prompt(content: str) -> str:
     )
 
 
+dataset = [Data(value=intro, properties=["easy"]) for intro in introductions]
+
+evaluators = [ValidJSON()]
+
+
 def run():
-    dataset = [Data(value=intro, properties=["easy"]) for intro in introductions]
-
-    evaluators = [ValidJSON()]
-
-    evaluation = Evaluation(
+    evaluation = Evaluation[str, Any](
         dataset=dataset, callback=prompt, evaluators=evaluators, num_simulation_runs=1
     )
 
@@ -82,3 +114,20 @@ def run():
 
     for result in evaluation.results:
         print("valid_json" in result.outcome.properties)
+
+
+def run2():
+    evals = [
+        Evaluation[str, Any](
+            dataset=dataset,
+            callback=prompt,
+            evaluators=evaluators,
+            num_simulation_runs=1,
+        )
+        for _ in range(2)
+    ]
+
+    for eval in evals:
+        eval.run()
+
+    ValidJSONCountThreshold().evaluate(evals[0], evals[1])
